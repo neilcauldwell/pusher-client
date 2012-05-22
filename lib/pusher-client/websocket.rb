@@ -60,5 +60,3 @@ module PusherClient
 
   end
 end
-
-

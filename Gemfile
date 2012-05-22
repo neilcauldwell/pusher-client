@@ -3,6 +3,8 @@ source "http://rubygems.org"
 gem "libwebsocket", "~>0.1.0"
 
 group :development do
+  gem "json"
+  gem "ruby-hmac"
   gem "bacon", ">= 0"
   gem "bundler", "~> 1.0.0"
   gem "jeweler", "~> 1.5.2"

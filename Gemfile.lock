@@ -7,10 +7,12 @@ GEM
       bundler (~> 1.0.0)
       git (>= 1.2.5)
       rake
+    json (1.4.6)
     libwebsocket (0.1.0)
     rake (0.8.7)
     rcov (0.9.9)
     rcov (0.9.9-java)
+    ruby-hmac (0.4.0)
 
 PLATFORMS
   java
@@ -20,5 +22,7 @@ DEPENDENCIES
   bacon
   bundler (~> 1.0.0)
   jeweler (~> 1.5.2)
+  json
   libwebsocket (~> 0.1.0)
   rcov
+  ruby-hmac

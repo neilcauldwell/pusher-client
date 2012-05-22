@@ -51,7 +51,6 @@ describe "A PusherClient::Channel" do
   end
 
   it 'should run callbacks when an event is dispatched' do
-
     @channel.bind('TestEvent') do
       PusherClient.logger.test "Local callback running"
     end
@@ -60,6 +59,91 @@ describe "A PusherClient::Channel" do
     PusherClient.logger.test_messages.should.include?("Local callback running")
   end
 
+end
+
+describe "A PusherClient::Subscriptions collection" do
+  before do
+    @subscriptions = PusherClient::Subscriptions.new
+  end
+
+  it "should initialize empty" do
+    @subscriptions.empty?.should.equal(true)
+    @subscriptions.size.should.equal 0
+  end
+
+  it "should instantiate new subscriptions added to it by channel and user_data" do
+    @subscriptions.add('TestChannel', 'user_id_1')
+    @subscription = @subscriptions.find('TestChannel')
+    @subscription.class.should.equal(PusherClient::Subscription)
+  end
+
+  it "should be able to find all subscriptions with a channel_name" do
+    @subscriptions.add('TestChannel', 'user_id_1')
+    @subscriptions.add('TestChannel', 'user_id_2')
+    @subs = @subscriptions.find_all('TestChannel')
+    @subs.size.should.equal 2
+    @subs.each { |s| s.channel.should.equal('TestChannel') }
+  end
+
+  it "should be able to find a unique subscription by channel_name and user_data" do
+    @subscriptions.add('TestChannel', 'user_id_1')
+    @subscription = @subscriptions.find('TestChannel')
+    @subscription.channel.should.equal('TestChannel')
+    @subscription.user_data.should.equal('user_id_1')
+  end
+
+  it "should allow removal of subscriptions by channel and user_data" do
+    @subscriptions.add('TestChannel', 'user_id_1')
+    @subscription = @subscriptions.find('TestChannel')
+    @subscription.class.should.equal(PusherClient::Subscription)
+    @subscriptions.remove('TestChannel', 'user_id_1')
+    @subscriptions.empty?.should.equal(true)
+  end
+
+  it "should not allow two subscriptions of the same channel and user" do
+    @subscriptions.add('TestChannel', 'user_id_1')
+    @subscriptions.add('TestChannel', 'user_id_1')
+    @subscriptions.add('TestChannel', 'user_id_2')
+    @subscriptions.size.should.equal 2
+  end
+
+end
+
+describe "A PusherClient::Subscription" do
+  before do
+    @subscriptions = PusherClient::Subscriptions.new
+    @subscription = @subscriptions.add("TestChannel", "user_id_1")
+  end
+
+  it 'should have a channel and a channel_name' do
+    @subscription.channel.should.equal "TestChannel"
+  end
+
+  it 'should have user_data' do
+    @subscription.user_data.should.equal "user_id_1"
+  end
+
+  it 'should not be subscribed by default' do
+    @subscription.subscribed.should.equal false
+  end
+
+  it 'should not be global by default' do
+    @subscription.global.should.equal false
+  end
+
+  it 'can have procs bound to an event' do
+    @subscription.bind('TestEvent') {}
+    @subscription.callbacks.size.should.equal 1
+  end
+
+  it 'should run callbacks when an event is dispatched' do
+    @subscription.bind('TestEvent') do
+      PusherClient.logger.test "Local callback running"
+    end
+
+    @subscription.dispatch('TestEvent', {})
+    PusherClient.logger.test_messages.should.include?("Local callback running")
+  end
 end
 
 describe "A PusherClient::Socket" do
@@ -72,10 +156,10 @@ describe "A PusherClient::Socket" do
   end
 
   it 'should raise ArgumentError if TEST_APP_KEY is not a nonempty string' do
-    lambda { 
+    lambda {
       @broken_socket = PusherClient::Socket.new('')
     }.should.raise(ArgumentError)
-    lambda { 
+    lambda {
       @broken_socket = PusherClient::Socket.new(555)
     }.should.raise(ArgumentError)
   end
@@ -97,21 +181,22 @@ describe "A PusherClient::Socket" do
       @socket.global_channel.subscribed.should.equal false
     end
 
-    it 'should subscribe to a channel' do
-      @channel = @socket.subscribe('testchannel')
-      @socket.channels['testchannel'].should.equal @channel
-      @channel.subscribed.should.equal true
+    it 'should create a subscription to a Public channel' do
+      @subscription = @socket.subscribe('TestChannel')
+      @socket.subscriptions['TestChannel'].should.equal @subscription
+      @subscription.subscribed.should.equal true
     end
 
-    it 'should unsubscribe from a channel' do
-      @channel = @socket.unsubscribe('testchannel')
-      PusherClient.logger.test_messages.last.should.include?('pusher:unsubscribe')
-      @socket.channels['testchannel'].should.equal nil
+    it 'should create a subscription to a Presence channel' do
+      @subscription = @socket.subscribe('presence-TestChannel', 'user_id_1')
+      @socket.subscriptions['presence-TestChannel'].should.equal @subscription
+      @subscription.subscribed.should.equal true
     end
 
-    it 'should allow binding of global events' do
-      @socket.bind('testevent') { |data| PusherClient.logger.test("testchannel received #{data}") }
-      @socket.global_channel.callbacks.has_key?('testevent').should.equal true
+    it 'should create a subscription to a Private channel' do
+      @subscription = @socket.subscribe('private-TestChannel', 'user_id_1')
+      @socket.subscriptions['private-TestChannel'].should.equal @subscription
+      @subscription.subscribed.should.equal true
     end
 
     it 'should trigger callbacks for global events' do
@@ -132,30 +217,29 @@ describe "A PusherClient::Socket" do
       @socket.connected.should.equal false
     end
 
-    describe "when subscribed to a channel" do
+    describe "...when subscribed to a subscription" do
       before do
-        @channel = @socket.subscribe('testchannel')
+        @subscription = @socket.subscribe('TestChannel')
       end
 
-      it 'should allow binding of callbacks for the subscribed channel' do
-        @socket['testchannel'].bind('testevent') { |data| PusherClient.logger.test(data) }
-        @socket['testchannel'].callbacks.has_key?('testevent').should.equal true
+      it 'should allow binding of callbacks for the subscribed subscription' do
+        @socket['TestChannel'].bind('TestEvent') { |data| PusherClient.logger.test(data) }
+        @socket['TestChannel'].callbacks.has_key?('TestEvent').should.equal true
       end
 
       it "should trigger channel callbacks when a message is received" do
         # Bind 2 events for the channel
-        @socket['testchannel'].bind('coming') { |data| PusherClient.logger.test(data) }
-        @socket['testchannel'].bind('going')  { |data| PusherClient.logger.test(data) }
+        @socket['TestChannel'].bind('coming') { |data| PusherClient.logger.test(data) }
+        @socket['TestChannel'].bind('going')  { |data| PusherClient.logger.test(data) }
 
         # Simulate the first event
-        @socket.simulate_received('coming', 'Hello!', 'testchannel')
+        @socket.simulate_received('coming', 'Hello!', 'TestChannel')
         PusherClient.logger.test_messages.last.should.include?('Hello!')
 
         # Simulate the second event
-        @socket.simulate_received('going', 'Goodbye!', 'testchannel')
+        @socket.simulate_received('going', 'Goodbye!', 'TestChannel')
         PusherClient.logger.test_messages.last.should.include?('Goodbye!')
       end
-
     end
   end
 end

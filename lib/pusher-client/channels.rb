@@ -1,6 +1,5 @@
 module PusherClient
   class Channels
-
     attr_reader :channels
 
     def initialize

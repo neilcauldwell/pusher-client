@@ -32,11 +32,23 @@ module PusherClient
     def connect(async = false)
       @connection_thread = Thread.new do
         @connection = TestConnection.new
-        @global_channel.dispatch('pusher:connection_established', {'socket_id' => '123abc'})
+        @global_channel.dispatch('pusher:connection_established', {'socket_id' => '123abc'}.to_json)
       end
       @connection_thread.run
       @connection_thread.join unless async
       return self
+    end
+
+    def fake_auth_data
+      "1e24bg5e98066bd16f27:e677cb1e1282b4f789f6f8f67473cfe5c2a9c6eed6cef9d0cdc0238b301f10b10f"
+    end
+
+    def get_presence_auth(subscription)
+      return fake_auth_data
+    end
+
+    def get_private_auth(subscription)
+      return fake_auth_data
     end
 
     def simulate_received(event_name, event_data, channel_name)
@@ -54,5 +66,4 @@ module PusherClient
   end
 
   PusherClient.logger = TestLogger.new('test.log')
-
 end

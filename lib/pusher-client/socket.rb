@@ -4,13 +4,13 @@ require 'digest/md5'
 
 module PusherClient
   class Socket
-    
+
     # Mimick the JavaScript client
-    CLIENT_ID = 'js' 
+    CLIENT_ID = 'js'
     VERSION = '1.7.1'
 
     attr_accessor :encrypted, :secure
-    attr_reader :path, :connected, :channels, :global_channel, :socket_id
+    attr_reader :path, :connected, :subscriptions, :global_channel, :socket_id
 
     def initialize(application_key, options={})
       raise ArgumentError if (!application_key.is_a?(String) || application_key.size < 1)
@@ -19,7 +19,7 @@ module PusherClient
       @key = application_key
       @secret = options[:secret]
       @socket_id = nil
-      @channels = Channels.new
+      @subscriptions = Subscriptions.new
       @global_channel = Channel.new('pusher_global_channel')
       @global_channel.global = true
       @secure = false
@@ -33,8 +33,9 @@ module PusherClient
         subscribe_all
       end
 
+      # TODO : Can we call disconnect on @subscriptions.subscription?
       bind('pusher:connection_disconnected') do |data|
-        @channels.channels.each { |c| c.disconnect }
+        @subscriptions.subscriptions.each { |s| s.disconnect }
       end
 
       bind('pusher:error') do |data|
@@ -80,24 +81,39 @@ module PusherClient
       end
     end
 
-    def subscribe(channel_name, user_id = nil)
-      @user_data = {:user_id => user_id}.to_json unless user_id.nil?
-      
-      channel = @channels << channel_name
-      if @connected
-        authorize(channel, method(:authorize_callback))
+    def subscribe(channel_name, user_id = nil, options={})
+      if user_id
+        user_data = {:user_id => user_id, :user_info => options}.to_json
+      else
+        user_data = {:user_id => '', :user_info => ''}.to_json
       end
-      return channel
+
+      subscription = @subscriptions.add(channel_name, user_data)
+      if @connected
+        authorize(subscription, method(:authorize_callback))
+      end
+      return subscription
     end
 
-    def unsubscribe(channel_name)
-      channel = @channels.remove channel_name
+    def subscribe_existing(subscription)
+      if @connected
+        authorize(subscription, method(:authorize_callback))
+      end
+      return subscription
+    end
+
+    def subscribe_all
+      @subscriptions.subscriptions.each{ |s| subscribe_existing(s) }
+    end
+
+    def unsubscribe(channel_name, user_data)
+      subscription = @subscriptions.remove(channel_name, user_data)
       if @connected
         send_event('pusher:unsubscribe', {
           'channel' => channel_name
         })
       end
-      return channel
+      return subscription
     end
 
     def bind(event_name, &callback)
@@ -106,63 +122,53 @@ module PusherClient
     end
 
     def [](channel_name)
-      if @channels[channel_name]
-        @channels[channel_name]
+      if @subscriptions[channel_name]
+        @subscriptions[channel_name]
       else
-        @channels << channel_name
+        @subscriptions << channel_name
       end
     end
 
-    def subscribe_all
-      @channels.channels.clone.each{ |k,v| 
-        subscribe(k)
-      }
-    end
-    
-    #auth for private and presence
-    def authorize(channel, callback)
-      if is_private_channel(channel.name)
-        auth_data = get_private_auth(channel)
-      elsif is_presence_channel(channel.name)
-        auth_data = get_presence_auth(channel)
-        channel_data = @user_data
+    def authorize(subscription, callback)
+      if is_private_channel(subscription)
+        auth_data = get_private_auth(subscription)
+      elsif is_presence_channel(subscription)
+        auth_data = get_presence_auth(subscription)
       end
-      # could both be nil if didn't require auth
-      callback.call(channel, auth_data, channel_data)
+      callback.call(subscription, auth_data)
     end
-    
-    def authorize_callback(channel, auth_data, channel_data)
+
+    def authorize_callback(subscription, auth_data)
       send_event('pusher:subscribe', {
-        'channel' => channel.name,
+        'channel' => subscription.channel,
         'auth' => auth_data,
-        'channel_data' => channel_data
+        'channel_data' => subscription.user_data
       })
-      channel.acknowledge_subscription(nil)
+      subscription.acknowledge_subscription(nil)
     end
-    
-    def is_private_channel(channel_name)
-      channel_name.match(/^private-/)
+
+    def is_private_channel(subscription)
+      subscription.channel.match(/^private-/)
     end
-    
-    def is_presence_channel(channel_name)
-      channel_name.match(/^presence-/)
+
+    def is_presence_channel(subscription)
+      subscription.channel.match(/^presence-/)
     end
-    
-    def get_private_auth(channel)
-      string_to_sign = @socket_id + ':' + channel.name
+
+    def get_private_auth(subscription)
+      string_to_sign = @socket_id + ':' + subscription.channel + ':' + subscription.user_data
       signature = HMAC::SHA256.hexdigest(@secret, string_to_sign)
       return "#{@key}:#{signature}"
     end
-    
-    def get_presence_auth(channel)
-      string_to_sign = @socket_id + ':' + channel.name + ':' + @user_data
+
+    def get_presence_auth(subscription)
+      string_to_sign = @socket_id + ':' + subscription.channel + ':' + subscription.user_data
       signature = HMAC::SHA256.hexdigest(@secret, string_to_sign)
-      return "#{@key}:#{signature}"    
+      return "#{@key}:#{signature}"
     end
-    
-    
+
     # For compatibility with JavaScript client API
-    alias :subscribeAll :subscribe_all 
+    alias :subscribeAll :subscribe_all
 
     def send_event(event_name, data)
       payload = {'event' => event_name, 'data' => data}.to_json
@@ -174,9 +180,9 @@ module PusherClient
 
     def send_local_event(event_name, event_data, channel_name)
       if (channel_name)
-        channel = @channels[channel_name]
-        if (channel)
-          channel.dispatch_with_all(event_name, event_data)
+        subs = @subscriptions.find_all(channel_name)
+        if (subs)
+          subs.each {|s| s.dispatch_with_all(event_name, event_data)}
         end
       end
 
@@ -194,5 +200,4 @@ module PusherClient
       end
     end
   end
-
 end

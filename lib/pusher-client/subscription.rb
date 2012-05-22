@@ -1,10 +1,11 @@
 module PusherClient
-  class Channel
+  class Subscription
     attr_accessor :global, :subscribed
-    attr_reader :name, :callbacks, :global_callbacks
+    attr_reader :channel, :user_data, :callbacks, :global_callbacks
 
-    def initialize(channel_name)
-      @name = channel_name
+    def initialize(channel_name, user_data)
+      @channel = channel_name
+      @user_data = user_data
       @global = false
       @callbacks = {}
       @global_callbacks = {}

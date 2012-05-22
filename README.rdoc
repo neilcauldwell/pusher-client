@@ -10,13 +10,14 @@ When binding to a global event, note that you still must be subscribed to the ch
 may be sent on. You can't just bind a global event without subscribing to any channels and call it a day.
 
 == Installation
+
   gem install pusher-client
 == Single-Threaded Usage
 The application will pause at socket.connect and handle events from Pusher as they happen.
 
   require 'pusher-client'
   PusherClient.logger = Logger.new(STDOUT)
-  options = {:secret => 'YOUR_APPLICATION_SECRET'} 
+  options = {:secret => 'YOUR_APPLICATION_SECRET'}
   socket = PusherClient::Socket.new(YOUR_APPLICATION_KEY, options)
 
   # Subscribe to two channels
@@ -42,6 +43,7 @@ The application will pause at socket.connect and handle events from Pusher as th
   socket.connect
 
 == Asynchronous Usage
+
 The socket will remain open in the background as long as your main application thread is running,
 and you can continue to subscribe/unsubscribe to channels and bind new events.
 
@@ -72,7 +74,7 @@ For further documentation, read the source & test suite. Some features of the Ja
 are not yet implemented.
 
 == Contributing to pusher-client
- 
+
 * Check out the latest master to make sure the feature hasn't been implemented or the bug hasn't been fixed yet
 * Check out the issue tracker to make sure someone already hasn't requested it and/or contributed it
 * Fork the project
@@ -80,6 +82,11 @@ are not yet implemented.
 * Commit and push until you are happy with your contribution
 * Make sure to add tests for it. This is important so I don't break it in a future version unintentionally.
 * Please try not to mess with the Rakefile, version, or history. If you want to have your own version, or is otherwise necessary, that is fine, but please isolate to its own commit so I can cherry-pick around it.
+
+== TODOs
+
+* Identify subscriptions on :channel and :user_id (rather than :user_data).
+* Create Channel instances that belong to a Subscription.
 
 == Copyright
 
