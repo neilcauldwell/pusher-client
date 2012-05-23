@@ -58,7 +58,6 @@ describe "A PusherClient::Channel" do
     @channel.dispatch('TestEvent', {})
     PusherClient.logger.test_messages.should.include?("Local callback running")
   end
-
 end
 
 describe "A PusherClient::Subscriptions collection" do
@@ -73,7 +72,7 @@ describe "A PusherClient::Subscriptions collection" do
 
   it "should instantiate new subscriptions added to it by channel and user_data" do
     @subscriptions.add('TestChannel', 'user_id_1')
-    @subscription = @subscriptions.find('TestChannel')
+    @subscription = @subscriptions.find('TestChannel', 'user_id_1')
     @subscription.class.should.equal(PusherClient::Subscription)
   end
 
@@ -87,14 +86,14 @@ describe "A PusherClient::Subscriptions collection" do
 
   it "should be able to find a unique subscription by channel_name and user_data" do
     @subscriptions.add('TestChannel', 'user_id_1')
-    @subscription = @subscriptions.find('TestChannel')
+    @subscription = @subscriptions.find('TestChannel', 'user_id_1')
     @subscription.channel.should.equal('TestChannel')
     @subscription.user_data.should.equal('user_id_1')
   end
 
   it "should allow removal of subscriptions by channel and user_data" do
     @subscriptions.add('TestChannel', 'user_id_1')
-    @subscription = @subscriptions.find('TestChannel')
+    @subscription = @subscriptions.find('TestChannel', 'user_id_1')
     @subscription.class.should.equal(PusherClient::Subscription)
     @subscriptions.remove('TestChannel', 'user_id_1')
     @subscriptions.empty?.should.equal(true)
@@ -106,7 +105,6 @@ describe "A PusherClient::Subscriptions collection" do
     @subscriptions.add('TestChannel', 'user_id_2')
     @subscriptions.size.should.equal 2
   end
-
 end
 
 describe "A PusherClient::Subscription" do
@@ -182,20 +180,23 @@ describe "A PusherClient::Socket" do
     end
 
     it 'should create a subscription to a Public channel' do
+      @socket.subscriptions.size.should.equal 0
       @subscription = @socket.subscribe('TestChannel')
-      @socket.subscriptions['TestChannel'].should.equal @subscription
+      @socket.subscriptions.size.should.equal 1
       @subscription.subscribed.should.equal true
     end
 
     it 'should create a subscription to a Presence channel' do
+      @socket.subscriptions.size.should.equal 0
       @subscription = @socket.subscribe('presence-TestChannel', 'user_id_1')
-      @socket.subscriptions['presence-TestChannel'].should.equal @subscription
+      @socket.subscriptions.size.should.equal 1
       @subscription.subscribed.should.equal true
     end
 
     it 'should create a subscription to a Private channel' do
+      @socket.subscriptions.size.should.equal 0
       @subscription = @socket.subscribe('private-TestChannel', 'user_id_1')
-      @socket.subscriptions['private-TestChannel'].should.equal @subscription
+      @socket.subscriptions.size.should.equal 1
       @subscription.subscribed.should.equal true
     end
 
@@ -227,19 +228,19 @@ describe "A PusherClient::Socket" do
         @socket['TestChannel'].callbacks.has_key?('TestEvent').should.equal true
       end
 
-      it "should trigger channel callbacks when a message is received" do
-        # Bind 2 events for the channel
-        @socket['TestChannel'].bind('coming') { |data| PusherClient.logger.test(data) }
-        @socket['TestChannel'].bind('going')  { |data| PusherClient.logger.test(data) }
+     it "should trigger channel callbacks when a message is received" do
+       # Bind 2 events for the channel
+       @socket['TestChannel'].bind('coming') { |data| PusherClient.logger.test(data) }
+       @socket['TestChannel'].bind('going')  { |data| PusherClient.logger.test(data) }
 
-        # Simulate the first event
-        @socket.simulate_received('coming', 'Hello!', 'TestChannel')
-        PusherClient.logger.test_messages.last.should.include?('Hello!')
+       # Simulate the first event
+       @socket.simulate_received('coming', 'Hello!', 'TestChannel')
+       PusherClient.logger.test_messages.last.should.include?('Hello!')
 
-        # Simulate the second event
-        @socket.simulate_received('going', 'Goodbye!', 'TestChannel')
-        PusherClient.logger.test_messages.last.should.include?('Goodbye!')
-      end
+       # Simulate the second event
+       @socket.simulate_received('going', 'Goodbye!', 'TestChannel')
+       PusherClient.logger.test_messages.last.should.include?('Goodbye!')
+     end
     end
   end
 end

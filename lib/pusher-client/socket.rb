@@ -33,7 +33,6 @@ module PusherClient
         subscribe_all
       end
 
-      # TODO : Can we call disconnect on @subscriptions.subscription?
       bind('pusher:connection_disconnected') do |data|
         @subscriptions.subscriptions.each { |s| s.disconnect }
       end

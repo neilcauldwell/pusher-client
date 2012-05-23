@@ -90,8 +90,11 @@ may be sent on. You can't just bind a global event without subscribing to any ch
 
 == TODOs
 
+* Implement Channel instances associated with Subscription instances.
+* Remove Subscriptions#find_for_bind workaround for lack of Channel instances
+* Remove the duplication between Socket#subscribe and #subscribe_existing
+* Test Socket.rb bind('pusher:connection_disconnected')
 * Identify subscriptions on :channel and :user_id (rather than :user_data).
-* Create Channel instances that belong to a Subscription.
 
 == Copyright
 
