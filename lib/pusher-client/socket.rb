@@ -8,6 +8,7 @@ module PusherClient
     # Mimick the JavaScript client
     CLIENT_ID = 'js'
     VERSION = '1.7.1'
+    PROTOCOL = '6'
 
     attr_accessor :encrypted, :secure
     attr_reader :path, :connected, :subscriptions, :global_channel, :socket_id
@@ -15,7 +16,7 @@ module PusherClient
     def initialize(application_key, options={})
       raise ArgumentError if (!application_key.is_a?(String) || application_key.size < 1)
 
-      @path = "/app/#{application_key}?client=#{CLIENT_ID}&version=#{VERSION}"
+      @path = "/app/#{application_key}?client=#{CLIENT_ID}&version=#{VERSION}&protocol=#{PROTOCOL}"
       @key = application_key
       @secret = options[:secret]
       @socket_id = nil
@@ -39,6 +40,12 @@ module PusherClient
 
       bind('pusher:error') do |data|
         PusherClient.logger.fatal("Pusher : error : #{data.inspect}")
+      end
+
+      # Keep this in case we're using a websocket protocol that doesn't
+      # implement ping/pong
+      bind('pusher:ping') do
+        send_event('pusher:pong', nil)
       end
     end
 
